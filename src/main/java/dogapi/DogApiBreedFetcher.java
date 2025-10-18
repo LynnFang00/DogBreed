@@ -24,12 +24,54 @@ public class DogApiBreedFetcher implements BreedFetcher {
      * @throws BreedNotFoundException if the breed does not exist (or if the API call fails for any reason)
      */
     @Override
-    public List<String> getSubBreeds(String breed) {
+    public List<String> getSubBreeds(String breed) throws BreedFetcher.BreedNotFoundException{
         // TODO Task 1: Complete this method based on its provided documentation
         //      and the documentation for the dog.ceo API. You may find it helpful
         //      to refer to the examples of using OkHttpClient from the last lab,
         //      as well as the code for parsing JSON responses.
         // return statement included so that the starter code can compile and run.
-        return new ArrayList<>();
+
+        if (breed == null || breed.isBlank()) {
+            throw new BreedNotFoundException("Breed must not be empty");
+        }
+
+        String normalized = breed.toLowerCase().trim();
+        String url = "https://dog.ceo/api/breed/" + normalized + "/list";
+
+        Request request = new Request.Builder().url(url).get().build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.body() == null) {
+                throw new BreedNotFoundException("Empty response from API");
+            }
+
+            String jsonString = response.body().string();
+            JSONObject root = new JSONObject(jsonString);
+            String status = root.optString("status", "");
+
+            if ("error".equalsIgnoreCase(status)) {
+                String msg = root.optString("message", "Breed not found");
+                throw new BreedNotFoundException(msg);
+            }
+
+            if (!"success".equalsIgnoreCase(status)) {
+                throw new BreedNotFoundException("Unexpected status: " + status);
+            }
+
+            JSONArray arr = root.optJSONArray("message");
+            if (arr == null) {
+                return Collections.emptyList();
+            }
+
+            List<String> subs = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                subs.add(arr.getString(i));
+            }
+
+            return subs;
+
+        } catch (IOException e) {
+            throw new BreedNotFoundException("Network error: " + e.getMessage(), e);
+        }
     }
-}
+ }
